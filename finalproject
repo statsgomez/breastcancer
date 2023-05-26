@@ -1,0 +1,499 @@
+##Breast cancer Wisconsin (original) dataset contains real data of 699 observations with independent variables that allows you to classify dependent variable into malignant or benign.
+
+##The dataset is perfect for logistic regression analysis.
+
+##Note: this is a clean dataset and has no missing values, ready to analyse.
+
+##Predictors are for recongnizing if a tumour is benign or malignant.
+
+##Vocabulary
+
+
+##Clump thickness
+##is a measure of how thick the cells are within a tumor. Benign cells tend to be grouped in mono-layers, while cancerous - in multi-layer.(Sarkar et al. 2017, p. 1)
+
+
+##Uniformity
+##of cell size and uniformity of cell shape are two characteristics that can be used to describe the appearance of cells under a microscope. Here we are checking the degree to which the cells in a sample are similar in size and shape.
+
+
+##Marginal adhesion
+##is the degree to which cells in a tissue sample adhere, or stick, to one another at the edges of the sample. Loss of adhesion might be a sign of malignancy.
+
+
+##Single
+##epithelial cell size is the size of individual cells in an epithelial tissue sample. Epithelial tissue is a type of tissue that covers the surface of the body and lines internal organs and structures. It is made up of cells that are tightly packed together and held in place by specialized junctions.
+
+
+##Bare nuclei
+##refers to cells in a tissue sample that are missing their cell membranes and cytoplasm, leaving only the nucleus visible.
+
+
+##Bland
+##chromatin is the appearance of the genetic material (chromatin) in the nucleus of a cell under a microscope. Chromatin is made up of DNA and proteins, and it contains the genetic information that controls the cell’s functions. When the chromatin in a cell’s nucleus is compact and uniform in appearance, it is said to be “bland.”
+
+
+##Normal
+##nucleoli are small, spherical structures found within the nucleus of a cell. They are composed of DNA, RNA, and proteins and are responsible for synthesizing ribosomes, which are the cellular structures that produce proteins. Nucleoli are usually visible under a microscope and can vary in size and appearance depending on the stage of the cell cycle and the cell’s function. In normal, healthy cells, nucleoli are usually small and have a distinct, well-defined border.
+
+
+##Mitosis
+##is the process of cell division that occurs in all living organisms. During mitosis, a single cell divides into two daughter cells, each of which contains a copy of the parent cell’s DNA. The process of mitosis is essential for the growth and repair of tissues and the production of new cells.
+
+
+## 2 in the class column refers to benign and 4 refers to malignant.
+
+
+library(dplyr)
+
+# Switch 2 with 0, and 4 with 1 in the 'Class' column
+breast_cancer <- breast_cancer %>%
+  mutate(Class = ifelse(Class == 2, 0, ifelse(Class == 4, 1, Class)))
+
+head(breast_cancer)
+
+
+# Check for missing values in the set
+missing_values <- colSums(is.na(breast_cancer))
+
+print(missing_values)
+
+#install.packages("ggplot2")
+library(ggplot2)
+
+# Select relevant columns for correlation plot (excluding non-numeric columns)
+numeric_columns <- sapply(breast_cancer, is.numeric)
+numeric_data <- breast_cancer[, numeric_columns]
+
+# Compute the correlation matrix
+correlation_matrix <- cor(numeric_data)
+
+# Reshape the correlation matrix
+corr_df <- reshape2::melt(correlation_matrix)
+
+# Create a correlation plot using ggplot2
+ggplot(corr_df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "Pink", midpoint = 0) +
+  theme_minimal() +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+labs(title = "Correlation Plot")
+
+#install.packages("FactoMineR")
+library(FactoMineR)
+library(factoextra)
+
+
+numeric_columns <- sapply(breast_cancer, is.numeric)
+numeric_data <- breast_cancer[, numeric_columns]
+
+# Principal Component Analysis on the data
+pca_result <- PCA(numeric_data, graph = FALSE)
+
+# Correlation Circle Plot
+corr_circle <- factoextra::fviz_pca_var(pca_result, col.var = "contrib",
+                                        gradient.cols = c("blue", "white", "red"),
+                                        axes = c(1, 2), repel = TRUE)
+
+# Display the correlation circle plot
+print(corr_circle)
+
+#install.packages("vctrs")
+#install.packages("caret")
+library(caret)
+
+set.seed(123)
+
+# Splitting for a training and test set
+
+train_index <- createDataPartition(breast_cancer$Class, p = 0.7, list = FALSE)
+train_set <- breast_cancer[train_index, ]
+test_set <- breast_cancer[-train_index, ]
+
+# Check training worked
+cat("Training set dimensions:", dim(train_set), "\n")
+
+# Check test worked
+cat("Test set dimensions:", dim(test_set), "\n")
+
+
+# Fiting the GLM for training set
+glm_model <- glm(Class ~ ., data = train_set, family = binomial)
+
+summary(glm_model)
+
+# Predict the probabilities using the test set
+test_set$predicted_prob <- predict(glm_model, newdata = test_set, type = "response")
+
+# Output the summary of the predicted probabilities in the test set
+summary(test_set$predicted_prob)
+
+# Min.     1st Qu.   Median   Mean    3rd Qu.   Max. 
+#0.001165 0.003796 0.012648 0.324640 0.986472 0.999999 
+
+rank <- glm(Class ~ ., family = binomial, data = train_set)
+
+# Print the summary of the GLM model
+summary(rank)
+
+# Call:
+#  glm(formula = Class ~ ., family = binomial, data = train_set)
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-3.3308  -0.1140  -0.0757   0.0204   2.3508  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                 -9.50901    1.30081  -7.310 2.67e-13 ***
+#  Clump.Thickness              0.36215    0.17131   2.114   0.0345 *  
+#  Uniformity.of.Cell.Size      0.21624    0.26071   0.829   0.4069    
+#Uniformity.of.Cell.Shape     0.21136    0.26476   0.798   0.4247    
+#Marginal.Adhesion            0.33859    0.15099   2.242   0.0249 *  
+#  Single.Epithelial.Cell.Size  0.09759    0.22568   0.432   0.6654    
+#Bare.Nuclei                  0.46063    0.11575   3.979 6.91e-05 ***
+#  Bland.Chromatin              0.44990    0.24131   1.864   0.0623 .  
+#Normal.Nucleoli              0.12508    0.13272   0.942   0.3460    
+#Mitoses                      0.49343    0.33342   1.480   0.1389    
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#Null deviance: 626.62  on 478  degrees of freedom
+#Residual deviance:  72.04  on 469  degrees of freedom
+#AIC: 92.04
+
+#Number of Fisher Scoring iterations: 8
+
+
+# Since the predictor Bare Nuclei has three asterisks next to it,
+# it has a p value less than .001 which says that it is extremely
+# statistically significant.  The clump thickness and marginal adhesion
+# predictors both have a single asterisk rating which means that The p-value
+# is less than 0.05 but greater than or equal to 0.01. This indicates that
+# the predictor is statistically significant at the 0.05 significance level. 
+
+
+# I've removed the second predictor and the third predictor to test
+# the changes to the correlations when
+rank2 <- glm(Class ~., family = binomial, data = train_set[-2,-3])
+
+summary(rank2)
+
+
+#Call:
+#  glm(formula = Class ~ ., family = binomial, data = train_set[-2, -3])
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-3.4053  -0.1127  -0.0741   0.0188   2.2976  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                  -9.5707     1.3104  -7.304 2.80e-13 ***
+#  Clump.Thickness               0.3920     0.1702   2.303   0.0213 *  
+#  Uniformity.of.Cell.Size       0.3591     0.1988   1.806   0.0709 .  
+#Marginal.Adhesion             0.3515     0.1502   2.340   0.0193 *  
+#  Single.Epithelial.Cell.Size   0.1143     0.2229   0.513   0.6081    
+#Bare.Nuclei                   0.4755     0.1144   4.156 3.24e-05 ***
+#  Bland.Chromatin               0.4450     0.2390   1.862   0.0626 .  
+#Normal.Nucleoli               0.1419     0.1297   1.094   0.2739    
+#Mitoses                       0.4999     0.3329   1.502   0.1331    
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#Null deviance: 625.719  on 477  degrees of freedom
+#Residual deviance:  72.607  on 469  degrees of freedom
+#AIC: 90.607
+
+#Number of Fisher Scoring iterations: 8
+
+
+
+aic_func <- step(rank)
+
+# I want to get the lowest score from the AIC for the best variables.
+
+#Start:  AIC=92.04
+#Class ~ Clump.Thickness + Uniformity.of.Cell.Size + Uniformity.of.Cell.Shape + 
+#  Marginal.Adhesion + Single.Epithelial.Cell.Size + Bare.Nuclei + 
+#  Bland.Chromatin + Normal.Nucleoli + Mitoses
+
+#Df Deviance     AIC
+#- Single.Epithelial.Cell.Size  1   72.228  90.228
+#- Uniformity.of.Cell.Shape     1   72.647  90.647
+#- Uniformity.of.Cell.Size      1   72.790  90.790
+#- Normal.Nucleoli              1   72.940  90.940
+#<none>                             72.040  92.040
+#- Mitoses                      1   75.308  93.308
+#- Bland.Chromatin              1   75.865  93.865
+#- Clump.Thickness              1   77.053  95.053
+#- Marginal.Adhesion            1   77.188  95.188
+#- Bare.Nuclei                  1   91.122 109.122
+
+#Step:  AIC=90.23
+#Class ~ Clump.Thickness + Uniformity.of.Cell.Size + Uniformity.of.Cell.Shape + 
+#  Marginal.Adhesion + Bare.Nuclei + Bland.Chromatin + Normal.Nucleoli + 
+#  Mitoses
+
+#Df Deviance     AIC
+#- Uniformity.of.Cell.Shape  1   72.912  88.912
+#- Uniformity.of.Cell.Size   1   73.209  89.209
+#- Normal.Nucleoli           1   73.282  89.282
+#<none>                          72.228  90.228
+#- Mitoses                   1   75.514  91.514
+#- Bland.Chromatin           1   76.420  92.420
+#- Clump.Thickness           1   77.078  93.078
+#- Marginal.Adhesion         1   78.595  94.595
+#- Bare.Nuclei               1   93.782 109.782
+
+#Step:  AIC=88.91
+#Class ~ Clump.Thickness + Uniformity.of.Cell.Size + Marginal.Adhesion + 
+#  Bare.Nuclei + Bland.Chromatin + Normal.Nucleoli + Mitoses
+
+#Df Deviance     AIC
+#- Normal.Nucleoli          1   74.389  88.389
+#<none>                         72.912  88.912
+#- Mitoses                  1   76.014  90.014
+#- Bland.Chromatin          1   77.111  91.111
+#- Uniformity.of.Cell.Size  1   77.719  91.719
+#- Clump.Thickness          1   78.654  92.654
+#- Marginal.Adhesion        1   79.729  93.729
+#- Bare.Nuclei              1   98.085 112.085
+
+#Step:  AIC=88.39
+#Class ~ Clump.Thickness + Uniformity.of.Cell.Size + Marginal.Adhesion + 
+#  Bare.Nuclei + Bland.Chromatin + Mitoses
+
+#Df Deviance     AIC
+#<none>                         74.389  88.389
+#- Mitoses                  1   77.107  89.107
+#- Bland.Chromatin          1   80.096  92.096
+#- Clump.Thickness          1   81.031  93.031
+#- Marginal.Adhesion        1   82.101  94.101
+#- Uniformity.of.Cell.Size  1   83.677  95.677
+#- Bare.Nuclei              1  101.337 113.337
+
+# The lowest scored AIC has the predictors as Mitoses, Bland.Chromatin,
+# Clump.Thickness, Marginal.Adhesion, Uniformity.of.Cell.Size, and Bare.Nuclei.
+
+# Normal.Nucleoli, Single.Epithelial.Cell.Size, Uniformity.of.Cell.Shape,
+# were all removed to have the better model. [8,5,3] need to be removed.
+
+predicted_probability <- predict(aic_func, type = "response", newdata = test_set[-10])
+
+y_hat <- ifelse(predicted_probability > 0.5, 1, 0)
+
+conf_matrix <- table(test_set[,10], y_hat)
+conf_matrix
+
+# Print the confusion matrix
+print(conf_matrix)
+
+#recall
+recall <- (conf_matrix[1,1] / (conf_matrix[1,1] + conf_matrix[2,1]))*100
+cat(paste("Recall: ", round(recall,2), "%\n"))
+
+#Recall:  95.52 %
+
+#accuracy
+accuracy <- ((conf_matrix[1,1] + conf_matrix[2,2]) / sum(conf_matrix))*100
+cat(paste("Accuracy: ", round(accuracy,2), "%\n"))
+
+#Accuracy:  97.55 %
+
+#precision
+precision <- (conf_matrix[1,1] / (conf_matrix[1,1] + conf_matrix[1,2]))*100
+F_1 <- (2*precision * recall) / (precision + recall)
+cat(paste("F1 score: ", round(F_1,2), "%\n"))
+
+#F1 score:  96.24 %
+
+#pi_0 for cut off
+pi_0 <- 0.3
+
+predicted_probability <- predict(aic_func, type = "response", newdata = test_set[-10])
+
+# Apply the new cut-off point to classify into 1 or 0
+y_hat <- ifelse(predicted_probability > pi_0, 1, 0)
+
+
+conf_matrix <- table(test_set[, 10], y_hat)
+
+print(conf_matrix)
+#y_hat
+#0   1
+#0  60   6
+#1   3 135
+
+
+# Calculate recall
+recall <- (conf_matrix[1, 1] / (conf_matrix[1, 1] + conf_matrix[2, 1])) * 100
+cat(paste("Recall: ", round(recall, 2), "%\n"))
+#Recall:  95.24 %
+
+# Calculate accuracy
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix) * 100
+cat(paste("Accuracy: ", round(accuracy, 2), "%\n"))
+#Accuracy:  95.59 %
+
+# Calculate precision
+precision <- (conf_matrix[1, 1] / (conf_matrix[1, 1] + conf_matrix[1, 2])) * 100
+cat(paste("Precision: ", round(precision, 2), "%\n"))
+#Precision:  90.91 %
+
+# Calculate F1 score
+F1 <- (2 * precision * recall) / (precision + recall)
+cat(paste("F1 score: ", round(F1, 2), "%\n"))
+#F1 score:  93.02 %
+
+# I got very good model scores here so I'm going to visualize the model.
+
+#install.packages("pROC")
+library(pROC)
+
+# Calculate the predicted probabilities for the test set
+test_set$predicted_prob <- predict(glm_model, newdata = test_set, type = "response")
+
+# ROC curve
+roc_curve <- roc(test_set$Class, test_set$predicted_prob)
+
+# ROC curve plot
+plot(roc_curve, main = "ROC Curve", xlab = "False Positive Rate", ylab = "True Positive Rate")
+
+# Calculate AUC
+auc_value <- auc(roc_curve)
+print(paste("AUC:", auc_value))
+
+#[1] "AUC: 0.996157224418095"
+
+# Best cutoff point for classification
+coords <- coords(roc_curve, "best")
+cutoff_point <- coords$threshold
+sensitivity <- coords$sensitivity
+specificity <- coords$specificity
+
+print(paste("Best Cutoff Point:", cutoff_point))
+print(paste("Sensitivity:", sensitivity))
+print(paste("Specificity:", specificity))
+
+
+#[1] "Best Cutoff Point: 0.793703348561277"
+#
+#[1] "Sensitivity: 1"
+#
+#[1] "Specificity: 0.978260869565217"
+
+
+#install.packages("ggpubr")
+library(ggpubr)
+ggarrange(glm_mitoses_plot, glm_bland_plot, glm_clump_plot, glm_marginal_plot, glm_unif_plot, glm_bare_plot,
+          ncol = 2, nrow = 3)
+
+library(caret)
+
+breast_cancer$Class <- factor(breast_cancer$Class, levels = c("0", "1"))
+
+loocv <- trainControl(method = "LOOCV")
+
+# LOOCV Model
+loocv_model <- train(Class ~ ., data = breast_cancer, method = "glm", family = binomial, trControl = loocv)
+
+print(loocv_model)
+
+# K-fold cross-validation
+k <- 5
+kfold <- trainControl(method = "cv", number = k)
+
+# K-fold cross-validation model
+kfold_model <- train(Class ~ ., data = breast_cancer, method = "glm", family = binomial, trControl = kfold)
+
+print(kfold_model)
+
+
+
+#Generalized Linear Model 
+
+#683 samples
+#9 predictor
+#2 classes: '0', '1' 
+
+#No pre-processing
+#Resampling: Leave-One-Out Cross-Validation 
+#Summary of sample sizes: 682, 682, 682, 682, 682, 682, ... 
+#Resampling results:
+
+#  Accuracy   Kappa    
+#0.9677892  0.9290631
+
+#Generalized Linear Model 
+
+#683 samples
+#9 predictor
+#2 classes: '0', '1' 
+
+#No pre-processing
+#Resampling: Cross-Validated (5 fold) 
+#Summary of sample sizes: 547, 546, 546, 546, 547 
+#Resampling results:
+
+#  Accuracy   Kappa    
+#0.9633963  0.9191857
+
+# LOOCV very minimally better than K-fold in accuracy.
+
+library(caret)
+
+formula <- Class ~ Clump.Thickness + Uniformity.of.Cell.Size + Uniformity.of.Cell.Shape +
+  Marginal.Adhesion + Single.Epithelial.Cell.Size + Bare.Nuclei +
+  Bland.Chromatin + Normal.Nucleoli + Mitoses
+
+ctrl <- trainControl(method = "cv", number = 10)
+
+model <- train(formula, data = breast_cancer, method = "glm", family = binomial(link = "probit"),
+               trControl = ctrl)
+
+print(model)
+
+#Generalized Linear Model 
+
+#683 samples
+#9 predictor
+#2 classes: '0', '1' 
+
+#No pre-processing
+#Resampling: Cross-Validated (10 fold) 
+#Summary of sample sizes: 615, 614, 615, 614, 614, 616, ... 
+#Resampling results:
+
+#  Accuracy   Kappa    
+#0.9677962  0.9291511
+
+# The LOOCV model is the best at
+#  Accuracy   Kappa    
+#0.9677892  0.9290631
+
+
+library(vcd)
+
+# Contingency table
+contingency_table <- table(breast_cancer$Uniformity.of.Cell.Size, breast_cancer$Class)
+
+# Chi-square test
+chisq_test <- chisq.test(contingency_table)
+
+print(chisq_test)
+
+#Pearson's Chi-squared test
+
+#data:  contingency_table
+#X-squared = 539.79, df = 9, p-value < 2.2e-16
+
+# Since the p-value is less than 2.2e-16, which is basically zero,
+# there is very strong evidence that the Uniformity of Cell Size is
+# a great predictor of a malignant tumour.
+
